@@ -21,20 +21,17 @@ NC='\033[0m'
 
 
 function install_sentinel() {
-  echo -e "${GREEN}Install sentinel.${NC}"
   apt-get -y install python-virtualenv virtualenv >/dev/null 2>&1
   git clone $SENTINEL_REPO $CONFIGFOLDER/sentinel >/dev/null 2>&1
   cd $CONFIGFOLDER/sentinel
   virtualenv ./venv >/dev/null 2>&1
   ./venv/bin/pip install -r requirements.txt >/dev/null 2>&1
-  echo  "* * * * * cd $CONFIGFOLDER/sentinel && ./venv/bin/python bin/sentinel.py >> $CONFIGFOLDER/sentinel.log 2>&1" > $CONFIGFOLDER/$COIN_NAME.cron
   crontab $CONFIGFOLDER/$COIN_NAME.cron
   rm $CONFIGFOLDER/$COIN_NAME.cron >/dev/null 2>&1
 }
 
 
 function compile_node() {
-  echo -e "Prepare to download $COIN_NAME"
   cd $TMP_FOLDER
   wget -q $COIN_REPO
   compile_error
@@ -80,14 +77,6 @@ EOF
   sleep 3
   systemctl start $COIN_NAME.service
   systemctl enable $COIN_NAME.service >/dev/null 2>&1
-
-  if [[ -z "$(ps axo cmd:100 | egrep $COIN_DAEMON)" ]]; then
-    echo -e "${RED}$COIN_NAME is not running${NC}, please investigate. You should start by running the following commands as root:"
-    echo -e "${GREEN}systemctl start $COIN_NAME.service"
-    echo -e "systemctl status $COIN_NAME.service"
-    echo -e "less /var/log/syslog${NC}"
-    exit 1
-  fi
 }
 
 
@@ -120,7 +109,6 @@ EOF
 
 
 function enable_firewall() {
-  echo -e "Installing and setting up firewall to allow ingress on port ${GREEN}$COIN_PORT${NC}"
   ufw allow $COIN_PORT/tcp comment "$COIN_NAME MN port" >/dev/null
   ufw allow ssh comment "SSH" >/dev/null 2>&1
   ufw limit ssh/tcp >/dev/null 2>&1
@@ -157,7 +145,6 @@ function get_ip() {
 function compile_error() {
 if [ "$?" -gt "0" ];
  then
-  echo -e "${RED}Failed to compile $COIN_NAME. Please investigate.${NC}"
   exit 1
 fi
 }
@@ -165,17 +152,14 @@ fi
 
 function checks() {
 if [[ $(lsb_release -d) != *16.04* ]]; then
-  echo -e "${RED}You are not running Ubuntu 16.04. Installation is cancelled.${NC}"
   exit 1
 fi
 
 if [[ $EUID -ne 0 ]]; then
-   echo -e "${RED}$0 must be run as root.${NC}"
    exit 1
 fi
 
 if [ -n "$(pidof $COIN_DAEMON)" ] || [ -e "$COIN_DAEMOM" ] ; then
-  echo -e "${RED}$COIN_NAME is already installed.${NC}"
   exit 1
 fi
 }
@@ -210,31 +194,12 @@ fi
 clear
 }
 
-
-function important_information() {
- echo
- echo -e "================================================================================================================================"
- echo -e "$COIN_NAME Masternode is up and running listening on port ${RED}$COIN_PORT${NC}."
- echo -e "Configuration file is: ${RED}$CONFIGFOLDER/$CONFIG_FILE${NC}"
- echo -e "Start: ${RED}systemctl start $COIN_NAME.service${NC}"
- echo -e "Stop: ${RED}systemctl stop $COIN_NAME.service${NC}"
- echo -e "VPS_IP:PORT ${RED}$NODEIP:$COIN_PORT${NC}"
- echo -e "MASTERNODE PRIVATEKEY is: ${RED}$COINKEY${NC}"
- if [[ -n $SENTINEL_REPO  ]]; then
-  echo -e "${RED}Sentinel${NC} is installed in ${RED}$CONFIGFOLDER/sentinel${NC}"
-  echo -e "Sentinel logs is: ${RED}$CONFIGFOLDER/sentinel.log${NC}"
- fi
- echo -e "Please check ${RED}$COIN_NAME${NC} is running with the following command: ${GREEN}systemctl status $COIN_NAME.service${NC}"
- echo -e "================================================================================================================================"
-}
-
 function setup_node() {
   get_ip
   create_config
   update_config
   enable_firewall
   install_sentinel
-  important_information
   configure_systemd
 }
 
